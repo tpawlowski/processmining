@@ -1,0 +1,5 @@
+bin
+bindist
+dist
+ivy
+**/.DS_Store
