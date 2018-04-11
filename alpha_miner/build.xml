@@ -7,7 +7,7 @@
 	<property name="release" location="latestrelease" />
 	<property name="version" value="${major_minor}.${env.BUILD_NUMBER}" />
 	<property name="project" value="alpha_miner" />
-	<property name="main-class" value="org.example.AlphaMiner" />
+	<property name="main-class" value="org.example.BeamAlphaMiner" />
 
 	<property name="author" value="Tomasz Pawlowski" />
 	<property name="organisation" value="University of Warsaw" />

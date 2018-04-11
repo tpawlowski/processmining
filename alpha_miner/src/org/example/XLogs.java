@@ -21,25 +21,20 @@ public class XLogs {
 	private static final XExtensionManager extensionManager = XExtensionManager.instance();
 	private static final Calendar cal = Calendar.getInstance();
 	
-	static XLog parse(String name, Iterable<String> encodedEntries) {
+	static XLog parse(String name, Iterable<LogEntry> logEntries) {
 		Map<String, XTrace> traces = new HashMap<String, XTrace>();
-		for (String encodedEntry: encodedEntries) {
-			String[] split = encodedEntry.split(",", 3);
-	        String caseId = split[0];
-	        long timestamp = Long.parseLong(split[1]);
-			String eventId = split[2];
-			
-			XTrace trace = traces.get(caseId);
+		for (LogEntry logEntry: logEntries) {
+			XTrace trace = traces.get(logEntry.getCaseId());
 			if (trace == null) {
 				trace = factory.createTrace();
-				trace.getAttributes().put("concept:name", factory.createAttributeLiteral("concept:name", caseId, extensionManager.getByPrefix("concept")));
-				traces.put(caseId, trace);
+				trace.getAttributes().put("concept:name", factory.createAttributeLiteral("concept:name", logEntry.getCaseId(), extensionManager.getByPrefix("concept")));
+				traces.put(logEntry.getCaseId(), trace);
 			}
 			
-			cal.setTimeInMillis(timestamp);
+			cal.setTimeInMillis(logEntry.getTimestamp().getMillis());
 			
 			XAttributeMapImpl map = new XAttributeMapImpl();
-			map.put("concept:name", new XAttributeLiteralImpl("concept:name", eventId));
+			map.put("concept:name", new XAttributeLiteralImpl("concept:name", logEntry.getEventId()));
 			map.put("lifecycle:transition", new XAttributeLiteralImpl("lifecycle:transition", "complete"));
 			map.put("time:timestamp", new XAttributeTimestampImpl("time:timestamp", cal.getTime()));
 			XEvent event = new XEventImpl(map);

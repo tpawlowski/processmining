@@ -1,19 +1,20 @@
 package org.example;
 
-public class LogEntry {
+import java.io.Serializable;
+
+import org.apache.beam.sdk.coders.DefaultCoder;
+import org.apache.beam.sdk.coders.SerializableCoder;
+import org.joda.time.Instant;
+
+@DefaultCoder(SerializableCoder.class)
+public class LogEntry implements Serializable {
+	private static final long serialVersionUID = -717606971675082275L;
+	
 	private String eventId;
 	private String caseId;
-	private Long timestamp;
+	private Instant timestamp;
 	
-	public LogEntry(String serializedEntry) {
-		super();
-		String[] split = serializedEntry.split(",", 3);
-        this.caseId = split[0];
-        this.timestamp = Long.parseLong(split[1]);
-		this.eventId = split[2];
-	}
-	
-	public LogEntry(String eventId, String caseId, Long timestamp) {
+	public LogEntry(String eventId, String caseId, Instant timestamp) {
 		super();
 		this.eventId = eventId;
 		this.caseId = caseId;
@@ -28,7 +29,7 @@ public class LogEntry {
 		return caseId;
 	}
 
-	public Long getTimestamp() {
+	public Instant getTimestamp() {
 		return timestamp;
 	}
 
