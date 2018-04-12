@@ -20,7 +20,7 @@ public class XLogs {
 	private static final XFactory factory = new XFactoryNaiveImpl();
 	private static final XExtensionManager extensionManager = XExtensionManager.instance();
 	private static final Calendar cal = Calendar.getInstance();
-	
+
 	static XLog parse(String name, Iterable<LogEntry> logEntries) {
 		Map<String, XTrace> traces = new HashMap<String, XTrace>();
 		for (LogEntry logEntry: logEntries) {
@@ -30,22 +30,22 @@ public class XLogs {
 				trace.getAttributes().put("concept:name", factory.createAttributeLiteral("concept:name", logEntry.getCaseId(), extensionManager.getByPrefix("concept")));
 				traces.put(logEntry.getCaseId(), trace);
 			}
-			
+
 			cal.setTimeInMillis(logEntry.getTimestamp().getMillis());
-			
+
 			XAttributeMapImpl map = new XAttributeMapImpl();
 			map.put("concept:name", new XAttributeLiteralImpl("concept:name", logEntry.getEventId()));
 			map.put("lifecycle:transition", new XAttributeLiteralImpl("lifecycle:transition", "complete"));
 			map.put("time:timestamp", new XAttributeTimestampImpl("time:timestamp", cal.getTime()));
 			XEvent event = new XEventImpl(map);
-			
+
 			trace.add(event);
 		}
 		XLog log = emptyLog(name);
 		log.addAll(traces.values());
 		return log;
 	}
-	
+
 	private static XLog emptyLog(String name) {
 		XFactory factory = new XFactoryNaiveImpl();
 		XExtensionManager extensionManager = XExtensionManager.instance();

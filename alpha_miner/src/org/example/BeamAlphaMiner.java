@@ -17,57 +17,49 @@ import org.apache.beam.sdk.values.TypeDescriptor;
 import org.apache.beam.sdk.values.TypeDescriptors;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.deckfour.xes.classification.XEventClass;
 import org.deckfour.xes.model.XLog;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.processmining.alphaminer.abstractions.AlphaClassicAbstraction;
-import org.processmining.alphaminer.algorithms.AlphaMiner;
-import org.processmining.alphaminer.algorithms.AlphaMinerFactory;
-import org.processmining.alphaminer.parameters.AlphaMinerParameters;
-import org.processmining.alphaminer.parameters.AlphaVersion;
 import org.processmining.alphaminer.plugins.AlphaMinerPlugin;
 import org.processmining.contexts.cli.CLIContext;
 import org.processmining.contexts.cli.CLIPluginContext;
 import org.processmining.framework.plugin.PluginContext;
-import org.processmining.framework.util.Pair;
 import org.processmining.models.graphbased.directed.petrinet.Petrinet;
-import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.plugins.pnml.base.Pnml;
 import org.processmining.plugins.pnml.exporting.PnmlExportNet;
 
 public class BeamAlphaMiner {
 	private static final PnmlExportNet exportNet = new PnmlExportNet();
 	private static final PluginContext context = new CLIPluginContext(new CLIContext(), "context");
-	
+
 	public static void main(String[] args) throws Exception {
 		PipelineOptions pipelineOptions = PipelineOptionsFactory.fromArgs(args).withValidation().create();
 		Pipeline pipeline = Pipeline.create(pipelineOptions);
-		
+
 		pipeline.apply(kafkaReader())
-			.apply(parseLogs())
-			.apply(Window.<KV<String, LogEntry>>into(FixedWindows.of(Duration.standardSeconds(10))))
-			.apply(GroupByKey.<String, LogEntry>create())
-			.apply(mineWindow())
-			.apply(kafkaWriter());
-		
+		.apply(parseLogs())
+		.apply(Window.<KV<String, LogEntry>>into(FixedWindows.of(Duration.standardSeconds(10))))
+		.apply(GroupByKey.<String, LogEntry>create())
+		.apply(mineWindow())
+		.apply(kafkaWriter());
+
 		PipelineResult result = pipeline.run();
-	    try {
-	    		result.waitUntilFinish();
-	    } catch (Exception exc) {
-	    		result.cancel();
-	    }
+		try {
+			result.waitUntilFinish();
+		} catch (Exception exc) {
+			result.cancel();
+		}
 	}
-	
+
 	private static PTransform<PBegin,PCollection<KV<String, String>>> kafkaReader() {
 		return KafkaIO.<String, String>read()
-			       .withBootstrapServers("localhost:9092")
-			       .withTopic("logs-input")
-			       .withKeyDeserializer(StringDeserializer.class)
-			       .withValueDeserializer(StringDeserializer.class)
-			       .withoutMetadata();
+				.withBootstrapServers("localhost:9092")
+				.withTopic("logs-input")
+				.withKeyDeserializer(StringDeserializer.class)
+				.withValueDeserializer(StringDeserializer.class)
+				.withoutMetadata();
 	}
-	
+
 	private static KafkaIO.Write<String, String> kafkaWriter() {
 		return KafkaIO.<String, String>write()
 				.withBootstrapServers("localhost:9092")
@@ -75,24 +67,24 @@ public class BeamAlphaMiner {
 				.withKeySerializer(StringSerializer.class)
 				.withValueSerializer(StringSerializer.class);
 	}
-	
+
 	private static MapElements<KV<String, String>, KV<String,LogEntry>> parseLogs() {
 		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptor.of(LogEntry.class)))
 				.via((KV<String, String> kv) -> {
 					String[] split = kv.getValue().split(",", 3);
 					String eventId = split[2];
-			        String caseId = split[0];
-			        Instant timestamp = new Instant(Long.parseLong(split[1]));
+					String caseId = split[0];
+					Instant timestamp = new Instant(Long.parseLong(split[1]));
 					return KV.of(kv.getKey(), new LogEntry(eventId, caseId, timestamp));
 				});
 	}
-	
+
 	private static MapElements<KV<String,Iterable<LogEntry>>, KV<String,String>> mineWindow() {
 		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
 				.via((kv) -> {
 					XLog log = XLogs.parse(kv.getKey(), kv.getValue());
-	        			Object[] net_and_marking = AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
-	        			String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
+					Object[] net_and_marking = AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
+					String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
 					return KV.of(kv.getKey(), net_xml);
 				});
 	}
