@@ -37,11 +37,11 @@ public class BeamAlphaMiner {
 		Pipeline pipeline = Pipeline.create(pipelineOptions);
 
 		pipeline.apply(kafkaReader())
-		.apply(parseLogs())
-		.apply(Window.<KV<String, LogEntry>>into(FixedWindows.of(Duration.standardSeconds(10))))
-		.apply(GroupByKey.<String, LogEntry>create())
-		.apply(mineWindow())
-		.apply(kafkaWriter());
+				.apply(parseLogs())
+				.apply(Window.<KV<String, LogEntry>>into(FixedWindows.of(Duration.standardSeconds(10))))
+				.apply(GroupByKey.<String, LogEntry>create())
+				.apply(mineWindow())
+				.apply(kafkaWriter());
 
 		PipelineResult result = pipeline.run();
 		try {
@@ -69,7 +69,8 @@ public class BeamAlphaMiner {
 	}
 
 	private static MapElements<KV<String, String>, KV<String,LogEntry>> parseLogs() {
-		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptor.of(LogEntry.class)))
+		return MapElements
+				.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptor.of(LogEntry.class)))
 				.via((KV<String, String> kv) -> {
 					String[] split = kv.getValue().split(",", 3);
 					String eventId = split[2];
@@ -83,8 +84,10 @@ public class BeamAlphaMiner {
 		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
 				.via((kv) -> {
 					XLog log = XLogs.parse(kv.getKey(), kv.getValue());
-					Object[] net_and_marking = AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
-					String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
+					Object[] net_and_marking = 
+							AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
+					String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(
+							context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
 					return KV.of(kv.getKey(), net_xml);
 				});
 	}
