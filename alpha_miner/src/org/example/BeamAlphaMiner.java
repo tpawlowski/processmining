@@ -26,6 +26,7 @@ import org.processmining.alphaminer.algorithms.AlphaMiner;
 import org.processmining.alphaminer.algorithms.AlphaMinerFactory;
 import org.processmining.alphaminer.parameters.AlphaMinerParameters;
 import org.processmining.alphaminer.parameters.AlphaVersion;
+import org.processmining.alphaminer.plugins.AlphaMinerPlugin;
 import org.processmining.contexts.cli.CLIContext;
 import org.processmining.contexts.cli.CLIPluginContext;
 import org.processmining.framework.plugin.PluginContext;
@@ -90,10 +91,8 @@ public class BeamAlphaMiner {
 		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
 				.via((kv) -> {
 					XLog log = XLogs.parse(kv.getKey(), kv.getValue());
-	        			AlphaMiner<XEventClass, ? extends AlphaClassicAbstraction<XEventClass>, ? extends AlphaMinerParameters> miner = AlphaMinerFactory
-	        					.createAlphaMiner(log, log.getClassifiers().get(0), new AlphaMinerParameters(AlphaVersion.CLASSIC));
-	        			Pair<Petrinet, Marking> net_and_marking = miner.run();
-	        			String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(context, net_and_marking.getFirst(), Pnml.PnmlType.PNML, true);
+	        			Object[] net_and_marking = AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
+	        			String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
 					return KV.of(kv.getKey(), net_xml);
 				});
 	}
