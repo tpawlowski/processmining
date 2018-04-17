@@ -1,5 +1,14 @@
 package org.example;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+import javax.imageio.ImageIO;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.kafka.KafkaIO;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -15,21 +24,22 @@ import org.apache.beam.sdk.values.PBegin;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.apache.beam.sdk.values.TypeDescriptors;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.deckfour.xes.model.XLog;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.processmining.alphaminer.plugins.AlphaMinerPlugin;
 import org.processmining.contexts.cli.CLIContext;
 import org.processmining.contexts.cli.CLIPluginContext;
 import org.processmining.framework.plugin.PluginContext;
-import org.processmining.models.graphbased.directed.petrinet.Petrinet;
-import org.processmining.plugins.pnml.base.Pnml;
-import org.processmining.plugins.pnml.exporting.PnmlExportNet;
+import org.processmining.models.graphbased.directed.fuzzymodel.MutableFuzzyGraph;
+import org.processmining.models.graphbased.directed.fuzzymodel.metrics.MetricsRepository;
+import org.processmining.plugins.fuzzymodel.FuzzyModelVisualization;
+import org.processmining.plugins.fuzzymodel.adapter.FuzzyAdapterPlugin;
+import org.processmining.plugins.fuzzymodel.miner.FuzzyMinerPlugin;
 
-public class BeamAlphaMiner {
-	private static final PnmlExportNet exportNet = new PnmlExportNet();
+public class BeamFuzzyMiner {
 	private static final PluginContext context = new CLIPluginContext(new CLIContext(), "context");
 
 	public static void main(String[] args) throws Exception {
@@ -60,12 +70,12 @@ public class BeamAlphaMiner {
 				.withoutMetadata();
 	}
 
-	private static KafkaIO.Write<String, String> kafkaWriter() {
-		return KafkaIO.<String, String>write()
+	private static KafkaIO.Write<String, byte[]> kafkaWriter() {
+		return KafkaIO.<String, byte[]>write()
 				.withBootstrapServers("localhost:9092")
-				.withTopic("logs-petri")
+				.withTopic("logs-images")
 				.withKeySerializer(StringSerializer.class)
-				.withValueSerializer(StringSerializer.class);
+				.withValueSerializer(ByteArraySerializer.class);
 	}
 
 	private static MapElements<KV<String, String>, KV<String,LogEntry>> parseLogs() {
@@ -80,15 +90,32 @@ public class BeamAlphaMiner {
 				});
 	}
 
-	private static MapElements<KV<String,Iterable<LogEntry>>, KV<String,String>> mineWindow() {
-		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
+	private static MapElements<KV<String,Iterable<LogEntry>>, KV<String, byte[]>> mineWindow() {
+		return MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptor.of(byte[].class)))
 				.via((kv) -> {
 					XLog log = XLogs.parse(kv.getKey(), kv.getValue());
-					Object[] net_and_marking = 
-							AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
-					String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(
-							context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
-					return KV.of(kv.getKey(), net_xml);
+					MetricsRepository metricRepo = (new FuzzyMinerPlugin()).mineDefault(context, log);
+					MutableFuzzyGraph fuzzyGraph = (new FuzzyAdapterPlugin()).mineGeneric(context, metricRepo);
+					JComponent component = (new FuzzyModelVisualization()).visualize(context, fuzzyGraph);
+					
+					JFrame frame = new javax.swing.JFrame();
+					frame.add(component);
+					frame.setSize(800,800);
+					frame.setVisible(true);
+					BufferedImage bi = new java.awt.image.BufferedImage(800, 800, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+					Graphics2D g = bi.createGraphics();
+					frame.paintComponents(g);
+					g.dispose();
+					
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					
+					try {
+						ImageIO.write(bi, "png", outputStream);
+						byte[] data = outputStream.toByteArray();
+						return KV.of(kv.getKey(), data);
+					} catch (IOException e) {
+						return null;
+					}
 				});
 	}
 }
