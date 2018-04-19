@@ -2,24 +2,14 @@
 
 This example shows how `AlphaMinerPlugin` from ProMs repository can be used inside Apache Beam pipeline.
 
-## Configuration
+## Quickstart
 
-To add ProMs library to the ivy build system changes in `ivysettings.xml` had to be made. Following resolvers were added, and appended to default chain:
-```
-<url name="prom">
-  <ivy pattern="https://svn.win.tue.nl/repos/[organisation]/Releases/Packages/[module]/[revision]/ivy.xml" />
-  <artifact pattern="https://svn.win.tue.nl/repos/[organisation]/Releases/Packages/[module]/[revision]/[artifact]-[revision].[ext]" />
-</url>
-<url name="prom-libs">
-  <ivy pattern="https://svn.win.tue.nl/repos/prom/Libraries/[module]/[revision]/ivy.xml" />
-  <artifact pattern="https://svn.win.tue.nl/repos/prom/Libraries/[module]/[revision]/[artifact]-[revision].[ext]" />
-  <artifact pattern="https://svn.win.tue.nl/repos/prom/Libraries/[module]/[revision]/[artifact]_[revision].[ext]" />
-</url>
-```
+1. Build alpha miner using `ant` command in `alpha_miner` directory.
+2. Start local kafka instance by executing `./demo_data/start_kafka.sh` script.
+3. Start populating kafka-s `logs-input` topic with data by executing: `./demo_data/kafka_demo_producer.sh`
+4. Start processing stream by running: `java -jar ./alpha_miner/dist/alpha_miner-with-dependencies.jar`.
 
-After doing so dependencies from ProMs repo can be listed in `ivy.xml` file as follows:
+You can watch the results by reading output topic:
 ```
-<dependency org="prom" name="PetriNets" rev="latest" changing="true" transitive="true" />
-<dependency org="prom" name="AlphaMiner" rev="latest" changing="true" transitive="true" />
-<dependency org="prom-libs" name="OpenXES" rev="20171212" changing="true" transitive="true" />
+./kafka_2.11-1.0.0/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic logs-petri --property print.key=true --property key.separator=": "
 ```
