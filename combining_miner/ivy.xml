@@ -1,0 +1,20 @@
+<ivy-module version="2.0">
+    <info organisation="mimuw" module="combining_miner" revision="latest">
+    	<description>
+    		Version 0.1
+    	</description>
+    </info>
+    <configurations>
+   		<conf name="default" extends="lib" />
+   		<conf name="lib" />
+	</configurations>
+    <dependencies defaultconf="default">
+       <dependency org="prom" name="PetriNets" rev="latest" changing="true" transitive="true" />
+       <dependency org="prom" name="AlphaMiner" rev="latest" changing="true" transitive="true" />
+       <dependency org="prom-libs" name="OpenXES" rev="20171212" changing="true" transitive="true" />
+       <dependency org="org.apache.kafka" name="kafka-clients" rev="1.0.0"/>
+       <dependency org="org.apache.beam" name="beam-runners-direct-java" rev="2.4.0" changing="true" transitive="true"/>
+       <dependency org="org.apache.beam" name="beam-sdks-java-core" rev="2.4.0" changing="true" transitive="true"/>
+       <dependency org="org.apache.beam" name="beam-sdks-java-io-kafka" rev="2.4.0" changing="true" transitive="true"/>
+    </dependencies>
+</ivy-module>
