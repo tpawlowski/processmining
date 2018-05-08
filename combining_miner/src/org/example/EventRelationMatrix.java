@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.apache.beam.sdk.coders.DefaultCoder;
 import org.apache.beam.sdk.coders.SerializableCoder;
+import org.apache.logging.log4j.util.Strings;
 import org.processmining.models.graphbased.directed.petrinet.Petrinet;
 import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
@@ -36,6 +37,7 @@ public class EventRelationMatrix implements Serializable {
 	
 	private void addLogEntries(Iterable<LogEntry> entries) {
 		String previous = null;
+		int i = 0;
 		for (LogEntry entry : entries) {
 			this.events.add(entry.getEventId());
 			if (previous != null) {
@@ -44,10 +46,12 @@ public class EventRelationMatrix implements Serializable {
 				this.startingEvents.add(entry.getEventId());
 			}
 			previous = entry.getEventId();
+			i++;
 		}
 		if (previous != null) {
 			this.endEvents.add(previous);
 		}
+		System.out.println("Init matrix with " + Integer.toString(i) + " entries");
 	}
 	
 	private void merge(EventRelationMatrix second) {
@@ -60,9 +64,12 @@ public class EventRelationMatrix implements Serializable {
 	public static EventRelationMatrix join(Iterable<EventRelationMatrix> values) {
 		EventRelationMatrix relation  = new EventRelationMatrix();
 		
+		int i = 0;
 		for (EventRelationMatrix value : values) {
 			relation.merge(value);
+			i += 1;
 		}
+		System.out.println("Merged " + Integer.toString(i) + " matrices. Relation size: " + Integer.toString(relation.relation.size()) + " different events: " + Integer.toString(relation.events.size()));
 		
 		return relation;
 	}
@@ -72,7 +79,7 @@ public class EventRelationMatrix implements Serializable {
 		
 		HashMap<String, Transition> transitions = addTransitions(net);
 		addPlacesAndArcs(net, transitions, new LinkedList<String>(), new LinkedList<String>(), 
-				new LinkedList<String>(events), new LinkedList<String>(events));
+				new LinkedList<String>(events), new LinkedList<String>(events), new LinkedList<String>(), new LinkedList<String>());
 		
 		Place input = net.addPlace("start");
 		for (String event : startingEvents) {
@@ -91,68 +98,87 @@ public class EventRelationMatrix implements Serializable {
 		HashMap<String, Transition> transitions = new HashMap<String, Transition>();
 		for (String event : this.events) {
 			transitions.put(event, net.addTransition(event));
+			System.out.println("Add transition " + event);
 		}
 		return transitions;
 	}
 	
-	private void addPlacesAndArcs(Petrinet net, HashMap<String, Transition> transitions, LinkedList<String> a, LinkedList<String> b, List<String> ma, List<String> mb) {
-		for (String event : ma) {
+	private void addPlacesAndArcs(Petrinet net, HashMap<String, Transition> transitions, 
+			LinkedList<String> a, LinkedList<String> b, 
+			LinkedList<String> ma, LinkedList<String> mb, // which elements can be included
+			LinkedList<String> fa, LinkedList<String> fb) { // which elements should not be included
+		if (ma.size() > 0) {
+			String event = ma.removeFirst();
+			// event is included in a
 			a.add(event);
-			List<String> nma = independent(ma, event);
-			List<String> nmb = children(mb, event);
-			
+			LinkedList<String> nma = independent(ma, event);
+			LinkedList<String> nfa = independent(fa, event);
+			LinkedList<String> nmb = children(mb, event);
+			LinkedList<String> nfb = children(fb, event);
+
 			if (nmb.isEmpty() && b.isEmpty()) {
-			} else if (nma.isEmpty() && nmb.isEmpty()) {
+			} else if (nma.isEmpty() && nmb.isEmpty() && nfa.isEmpty() && nfb.isEmpty()) {
 				addPlace(net, transitions, a, b);
 			} else {
-				addPlacesAndArcs(net, transitions, a, b, nma, nmb);
+				addPlacesAndArcs(net, transitions, a, b, nma, nmb, nfa, nfb);
 			}
-			
 			a.removeLast();
-		}
-		for (String event : mb) {
+
+			// event is not included in a
+			fa.add(event);
+			addPlacesAndArcs(net, transitions, a, b, ma, mb, fa, fb);
+		} else if 	(mb.size() > 0){
+			String event = mb.removeFirst();
+			// event is included in b
+
 			b.add(event);
-			List<String> nmb = independent(mb, event);
-			List<String> nma = parents(ma, event);
+			LinkedList<String> nmb = independent(mb, event);
+			LinkedList<String> nfb = independent(fb, event);
+			LinkedList<String> nma = parents(ma, event);
+			LinkedList<String> nfa = parents(fa, event);
 			
 			if (nma.isEmpty() && a.isEmpty()) {
-			} else if (nma.isEmpty() && nmb.isEmpty()) {
+			} else if (nma.isEmpty() && nmb.isEmpty() && nfa.isEmpty() && nfb.isEmpty()) {
 				addPlace(net, transitions, a, b);
 			} else {
-				addPlacesAndArcs(net, transitions, a, b, nma, nmb);
+				addPlacesAndArcs(net, transitions, a, b, nma, nmb, nfa, nfb);
 			}
 			b.removeLast();
+
+			fb.add(event);
+			addPlacesAndArcs(net, transitions, a, b, ma, mb, fa, fb);
 		}
 	}
 	
 	private void addPlace(Petrinet net, HashMap<String, Transition> transitions, LinkedList<String> a, LinkedList<String> b) {
-		Place p = net.addPlace("");
+		System.out.println("Add place " + Strings.join(a, ',') + " " + Strings.join(b, ','));
+		Place p = net.addPlace("([" + Strings.join(a, ',')  + "], [" + Strings.join(b, ',')  + "])" );
 		for (String event : a) {
-			net.addArc(transitions.get(event), p);
+			net.addArc(transitions.get(event), p, 1);
 		}
 		for (String event : b) {
-			net.addArc(p, transitions.get(event));
+			net.addArc(p, transitions.get(event), 1);
 		}
 	}
 	
-	private List<String> independent(List<String> list, String event) {
-		List<String> output = new LinkedList<String>(list);
+	private LinkedList<String> independent(List<String> list, String event) {
+		LinkedList<String> output = new LinkedList<String>(list);
 		output.removeIf((element) -> {
 			return element == event || contains(element, event) || contains(event, element);
 		});
 		return output;
 	}
 	
-	private List<String> children(List<String> list, String event) {
-		List<String> output = new LinkedList<String>(list);
+	private LinkedList<String> children(List<String> list, String event) {
+		LinkedList<String> output = new LinkedList<String>(list);
 		output.removeIf((element) -> {
 			return element == event || contains(element, event) || !contains(event, element);
 		});
 		return output;
 	}
 	
-	private List<String> parents(List<String> list, String event) {
-		List<String> output = new LinkedList<String>(list);
+	private LinkedList<String> parents(List<String> list, String event) {
+		LinkedList<String> output = new LinkedList<String>(list);
 		output.removeIf((element) -> {
 			return element == event || !contains(element, event) || contains(event, element);
 		});

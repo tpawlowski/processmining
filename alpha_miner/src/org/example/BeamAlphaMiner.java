@@ -1,5 +1,13 @@
 package org.example;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.kafka.KafkaIO;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -24,7 +32,12 @@ import org.processmining.alphaminer.plugins.AlphaMinerPlugin;
 import org.processmining.contexts.cli.CLIContext;
 import org.processmining.contexts.cli.CLIPluginContext;
 import org.processmining.framework.plugin.PluginContext;
+import org.processmining.models.graphbased.AttributeMap;
+import org.processmining.models.graphbased.ViewSpecificAttributeMap;
 import org.processmining.models.graphbased.directed.petrinet.Petrinet;
+import org.processmining.models.graphbased.directed.petrinet.elements.Place;
+import org.processmining.models.jgraph.ProMJGraphVisualizer;
+import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.plugins.pnml.base.Pnml;
 import org.processmining.plugins.pnml.exporting.PnmlExportNet;
 
@@ -86,9 +99,31 @@ public class BeamAlphaMiner {
 					XLog log = XLogs.parse(kv.getKey(), kv.getValue());
 					Object[] net_and_marking = 
 							AlphaMinerPlugin.applyAlphaClassic(context, log, log.getClassifiers().get(0));
+					
+					visualise((Petrinet)net_and_marking[0], "/tmp/test_alpha.png");
+					
 					String net_xml = exportNet.exportPetriNetToPNMLOrEPNMLString(
 							context, (Petrinet)net_and_marking[0], Pnml.PnmlType.PNML, true);
 					return KV.of(kv.getKey(), net_xml);
 				});
+	}
+	
+	private static void visualise(Petrinet p, String path) {
+		ViewSpecificAttributeMap map = new ViewSpecificAttributeMap();
+		JComponent comp = ProMJGraphVisualizer.instance().visualizeGraph(context, p, map);
+		JFrame frame = new javax.swing.JFrame();
+	    frame.add(comp);
+	    frame.setSize(800,800);
+	    frame.setVisible(true);
+	    BufferedImage bi = new BufferedImage(800, 800, BufferedImage.TYPE_INT_ARGB);
+	    Graphics2D g = bi.createGraphics();
+	    frame.paintComponents(g);
+	    g.dispose();
+
+	    // debugging - same files are saved in kafka
+	    try {
+	    		javax.imageio.ImageIO.write(bi, "png", new File(path));
+	    } catch (IOException e) {
+	    }
 	}
 }

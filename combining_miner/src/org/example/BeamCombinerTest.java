@@ -1,5 +1,13 @@
 package org.example;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.kafka.KafkaIO;
@@ -23,7 +31,9 @@ import org.joda.time.Instant;
 import org.processmining.contexts.cli.CLIContext;
 import org.processmining.contexts.cli.CLIPluginContext;
 import org.processmining.framework.plugin.PluginContext;
+import org.processmining.models.graphbased.ViewSpecificAttributeMap;
 import org.processmining.models.graphbased.directed.petrinet.Petrinet;
+import org.processmining.models.jgraph.ProMJGraphVisualizer;
 import org.processmining.plugins.pnml.base.Pnml;
 import org.processmining.plugins.pnml.exporting.PnmlExportNet;
 
@@ -96,9 +106,29 @@ public class BeamCombinerTest {
 				.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
 				.via((KV<Void, EventRelationMatrix> kv) -> {
 					Petrinet net = kv.getValue().mine();
+					visualise(net, "/tmp/test_combiner.png");
 					String net_xml = (new PnmlExportNet()).exportPetriNetToPNMLOrEPNMLString(
 							context, net, Pnml.PnmlType.PNML, true);
 					return KV.of("", net_xml);
 				});
+	}
+	
+	private static void visualise(Petrinet p, String path) {
+		ViewSpecificAttributeMap map = new ViewSpecificAttributeMap();
+		JComponent comp = ProMJGraphVisualizer.instance().visualizeGraph(context, p, map);
+		JFrame frame = new javax.swing.JFrame();
+	    frame.add(comp);
+	    frame.setSize(800,800);
+	    frame.setVisible(true);
+	    BufferedImage bi = new BufferedImage(800, 800, BufferedImage.TYPE_INT_ARGB);
+	    Graphics2D g = bi.createGraphics();
+	    frame.paintComponents(g);
+	    g.dispose();
+
+	    // debugging - same files are saved in kafka
+	    try {
+	    		javax.imageio.ImageIO.write(bi, "png", new File(path));
+	    } catch (IOException e) {
+	    }
 	}
 }
